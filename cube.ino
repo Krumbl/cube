@@ -1,5 +1,8 @@
 #define CUBESIZE 3
 #define PLANESIZE CUBESIZE*CUBESIZE
+// max number of sequence steps allowed - will fail silently and loop atmost 100
+#define MAXSEQ 100
+// TODO define seq data size (ie CUBESIZE + 1)
 
 
 //Pin connected to ST_CP of 74HC595
@@ -25,14 +28,51 @@ int PlanePin[] = {2, 3, 4};
 // 7 8 9
 // 987654321
 
+// TODO alternatively store as one int
+// 	value = 1000 ^ layer * layerSeq
+// 	max will be 511511511
+
+int speed = 500;
+int seqStart[] = {
+	0, 0, 0, speed, 
+	// columns
+	1, 1, 1, speed,
+	2, 2, 2, speed, 
+	4, 4, 4, speed,
+	8, 8, 8, speed, 
+	16, 16, 16, speed,
+	32, 32, 32, speed,
+	64, 64, 64, speed,
+	128, 128, 128, speed,
+	256, 256, 256, speed,
+	// rows
+	511, 0, 0, speed,
+	0, 511, 0, speed,
+	0, 0, 511, speed,
+	0, 511, 0, speed,
+	511, 0, 0, speed,
+	// slices - horizontal (123)
+	7, 7, 7, speed,
+	56, 56, 56, speed,
+	448, 448, 448, speed,
+	56, 56, 56, speed,
+	7, 7, 7, speed,
+	// slices - vertical (147)
+	73, 73, 73, speed,
+	146, 146, 146, speed,
+	292, 292, 292, speed,
+	146, 146, 146, speed,
+	73, 73, 73, speed,
+};
+
+
 int seqBlink[] = {
 	// binary formatter only works on 8 bits must split to get higher
-	B00000001 * 256 + B11111111, 256 + B11111111, 256 + B11111111, 2,
-	B00000000, B00000000, B00000000, 1,
+	B00000001 * 256 + B11111111, 256 + B11111111, 256 + B11111111, 2000,
+	B00000000, B00000000, B00000000, 1000,
 };
-//int maxSeq = 10; // max number of sequence steps allowed
-//int seq[maxSeq]; // the current seq being displayed
-int seqSize = 1;
+int seq[MAXSEQ]; // the current seq being displayed
+int seqSize = 25;
 
 void setup() {
 	//set pins to output so you can control the shift register
@@ -48,6 +88,8 @@ void setup() {
 	Serial.begin(9600);
 	Serial.println("Setup");
 	delay(2000);// Give reader a chance to see the output.
+
+	chooseSeq(seqStart);
 }
 
 void loop() {
@@ -56,7 +98,7 @@ void loop() {
 
 	loadLayer();
 
-	while (millis() < start + seqBlink[currentSeq * (CUBESIZE+ 1) + CUBESIZE] * 1000) {
+	while (millis() < start + seq[currentSeq * (CUBESIZE+ 1) + CUBESIZE]) {
 		rotate();
 	}
 
@@ -109,16 +151,16 @@ void on() {
 }
 
 // current layer values
-int layer[CUBESIZE];// = {B00000000, B00000000, B00000000};
-int layer9[CUBESIZE];// = {0,0,0};
+int layer[CUBESIZE];
+int layer9[CUBESIZE];
 // load currentSeq layer
 void loadLayer() {
 	log("load");
 	log(currentSeq);
 
 	for (int i = 0; i < CUBESIZE; i++) {
-		layer[i] = seqBlink[currentSeq * (CUBESIZE + 1) + i] & B11111111;
-		layer9[i] = seqBlink[currentSeq * (CUBESIZE + 1) + i] >> 8;
+		layer[i] = seq[currentSeq * (CUBESIZE + 1) + i] & B11111111;
+		layer9[i] = seq[currentSeq * (CUBESIZE + 1) + i] >> 8;
 	}
 }
 
@@ -133,7 +175,7 @@ void rotate() {
 	digitalWrite(latchPin, LOW);
 
 	// shift out the bits:
-	shiftOut(dataPin, clockPin, LSBFIRST, layer[displayLayer]);
+	shiftOut(dataPin, clockPin, MSBFIRST, layer[displayLayer]);
 
 	// turn off before changing values to avoid any flicker
 	off();
@@ -148,3 +190,18 @@ void rotate() {
 	on();
 }
 
+// TODO use push button/dip switch to select layer
+void chooseSeq(int chosen[]) {
+	log("Load new seq");
+	seqSize = sizeof(chosen) / sizeof(int);
+	log(seqSize);
+	seqSize = 25;
+	for (int i = 0; i < seqSize * (CUBESIZE + 1); i++) {
+		seq[i] = chosen[i];
+		log(seq[i]);
+	}
+	log("Done load new seq");
+}
+
+
+// TODO - potentiometer = speed??
