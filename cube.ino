@@ -20,19 +20,19 @@ int currentSeq = 0; // current sequence step being displayed
 
 int PlanePin[] = {2, 3, 4};
 
-// 3 4 5
-// 2 9 6
-// 1 8 7
-// 12345678
+// 1 2 3
+// 4 5 6
+// 7 8 9
+// 987654321
 
 int seqBlink[] = {
-	B111, B111, B111, B111, B111, B111, B111, B111, B101, 5,
-	B000, B000, B000, B000, B000, B000, B000, B000, B010, 1,
-	B000, B000, B000, B000, B000, B000, B000, B000, B000, 1,
+	// binary formatter only works on 8 bits must split to get higher
+	B00000001 * 256 + B11111111, 256 + B11111111, 256 + B11111111, 2,
+	B00000000, B00000000, B00000000, 1,
 };
 //int maxSeq = 10; // max number of sequence steps allowed
 //int seq[maxSeq]; // the current seq being displayed
-int seqSize = 3;
+int seqSize = 1;
 
 void setup() {
 	//set pins to output so you can control the shift register
@@ -56,7 +56,7 @@ void loop() {
 
 	loadLayer();
 
-	while (millis() < start + seqBlink[currentSeq * (PLANESIZE + 1) + 9] * 1000) {
+	while (millis() < start + seqBlink[currentSeq * (CUBESIZE+ 1) + CUBESIZE] * 1000) {
 		rotate();
 	}
 
@@ -109,91 +109,42 @@ void on() {
 }
 
 // current layer values
-int layer[] = {B00000000, B00000000, B00000000};
-int layer9[] = {0,0,0};
+int layer[CUBESIZE];// = {B00000000, B00000000, B00000000};
+int layer9[CUBESIZE];// = {0,0,0};
 // load currentSeq layer
 void loadLayer() {
 	log("load");
 	log(currentSeq);
 
-	int current = 0;
-
-	// iterate the values in the sequence
-	// rearrange from rows to layers
-	for (int i = 0; i < 8; i++) {
-		// get the value of layer0
-		int x = seqBlink[currentSeq * (PLANESIZE + 1) +i] & B100;
-		// shift into place
-		x = x >> 2;
-		x = x<< (7 - i);
-		// append to values
-		current = current | x;
-	}
-	layer[0] = current;
-	{
-		int x = seqBlink[currentSeq * (PLANESIZE + 1) + 8] & B100;
-		x = x >> 2;
-		layer9[0] = x;  
-	}
-
-	// iterate the values in the sequence
-	// rearrange from rows to layers
-	for (int i = 0; i < 8; i++) {
-		// get the value of layer0
-		int x = seqBlink[currentSeq * (PLANESIZE + 1) +i] & B010;
-		// shift into place
-		x = x >> 1;
-		x = x<< (7 - i);
-		// append to values
-		current = current | x;
-	}
-	layer[1] = current;
-	{
-		int x = seqBlink[currentSeq * (PLANESIZE + 1) + 8] & B010;
-		x = x >> 1;
-		layer9[1] = x;
-	}
-
-	// iterate the values in the sequence
-	// rearrange from rows to layers
-	for (int i = 0; i < 8; i++) {
-		// get the value of layer0
-		int x = seqBlink[currentSeq * (PLANESIZE + 1) +i] & B001;
-		// shift into place
-		x = x<< (7 - i);
-		// append to values
-		current = current | x;
-	}
-	layer[2] = current;
-	{
-		int x = seqBlink[currentSeq * (PLANESIZE + 1) + 8] & B001;
-		layer9[2] = x;
+	for (int i = 0; i < CUBESIZE; i++) {
+		layer[i] = seqBlink[currentSeq * (CUBESIZE + 1) + i] & B11111111;
+		layer9[i] = seqBlink[currentSeq * (CUBESIZE + 1) + i] >> 8;
 	}
 }
 
 
 // rotate next layer in and display
 void rotate() {
-  // switch layer to next layer
-  displayLayer = ++displayLayer % CUBESIZE;
-  // load value in
-  // take the latchPin low so 
-  // the LEDs don't change while you're sending in bits:
-  digitalWrite(latchPin, LOW);
+	// switch layer to next layer
+	displayLayer = ++displayLayer % CUBESIZE;
+	// load value in
+	// take the latchPin low so 
+	// the LEDs don't change while you're sending in bits:
+	digitalWrite(latchPin, LOW);
 
-  // shift out the bits:
-  shiftOut(dataPin, clockPin, LSBFIRST, layer[displayLayer]);
-  
-  // turn off before changing values to avoid any flicker
-  off();
-  
-  // any work while off will cause dimming!
-  // take the latch pin high so the new values get stored in
-  digitalWrite(latchPin, HIGH);
+	// shift out the bits:
+	shiftOut(dataPin, clockPin, LSBFIRST, layer[displayLayer]);
 
-  digitalWrite(pin9, layer9[displayLayer]);
-  
-  // turn back on
-  on();
+	// turn off before changing values to avoid any flicker
+	off();
+
+	// any work while off will cause dimming!
+	// take the latch pin high so the new values get stored in
+	digitalWrite(latchPin, HIGH);
+
+	digitalWrite(pin9, layer9[displayLayer]);
+
+	// turn back on
+	on();
 }
 
